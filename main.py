@@ -108,21 +108,62 @@ class ChordAnalyzer:
     def analyze(self, notes: List[Note]) -> str:
         if not notes: return "No notes"
 
+        # 1. 実際の入力音を高さ順にソートし、ベース音（最低音）を確定
         sorted_notes = sorted(notes, key=lambda n: n.absolute_semitone)
-        root_note = sorted_notes[0]
+        bass_note = sorted_notes[0]
 
-        intervals = set()
-        for note in sorted_notes:
-            intervals.add(self._get_interval(root_note, note))
+        # 2. 入力された音から、重複を省いた「仮のルート候補」のリストを作成
+        # ※ルートポジション（基本形）を優先して判定するため、ベース音の音名を最初にテストする
+        unique_cands = {}
+        for n in sorted_notes:
+            if n.pitch_class not in unique_cands:
+                unique_cands[n.pitch_class] = n
+                
+        candidates = [unique_cands[bass_note.pitch_class]]
+        for pc, n in unique_cands.items():
+            if pc != bass_note.pitch_class:
+                candidates.append(n)
 
-        quality = self.chord_dictionary.get(frozenset(intervals), "Unknown")
-        
-        alter_str = "#" if root_note.alter == 1 else "b" if root_note.alter == -1 else ""
-        root_name = f"{root_note.step}{alter_str}"
+        # 3. 総当たり推論
+        for cand in candidates:
+            # 仮想のルート音（ダミールート）をベース音のオクターブに生成
+            dummy_root = Note(cand.step, cand.alter, bass_note.octave)
+            
+            # もしダミールートがベース音より高くなってしまったら、1オクターブ下げる
+            # (例: ベースが E4 で、仮ルートが G の場合、G4 だと E4 より高くなるため G3 にする)
+            if dummy_root.absolute_semitone > bass_note.absolute_semitone:
+                dummy_root.octave -= 1
+                
+            intervals = set()
+            for note in sorted_notes:
+                intervals.add(self._get_interval(dummy_root, note))
+                
+            # 辞書と照合
+            quality = self.chord_dictionary.get(frozenset(intervals))
+            
+            if quality:
+                # 4. 推論に成功した場合の出力フォーマット
+                cand_alter_str = "#" if cand.alter == 1 else "b" if cand.alter == -1 else ""
+                root_name = f"{cand.step}{cand_alter_str}"
+                
+                bass_alter_str = "#" if bass_note.alter == 1 else "b" if bass_note.alter == -1 else ""
+                bass_name = f"{bass_note.step}{bass_alter_str}"
+                
+                # ルートとベースが同じなら通常コード、違えばオンコード
+                if cand.pitch_class == bass_note.pitch_class:
+                    chord_name = f"{root_name} {quality}"
+                else:
+                    chord_name = f"{root_name} {quality} / {bass_name}"
+                    
+                notes_str = ", ".join(str(n) for n in sorted_notes)
+                intervals_str = ", ".join(intervals)
+                return f"Input: [{notes_str}] -> Analyzed: {chord_name}"
+
+        # どのルートを仮定しても辞書にない場合
         notes_str = ", ".join(str(n) for n in sorted_notes)
-        intervals_str = ", ".join(intervals)
-
-        return f"Input: [{notes_str}] -> Intervals: [{intervals_str}] -> Analyzed: {root_name} {quality}"
+        bass_alter_str = "#" if bass_note.alter == 1 else "b" if bass_note.alter == -1 else ""
+        bass_name = f"{bass_note.step}{bass_alter_str}"
+        return f"Input: [{notes_str}] -> Analyzed: Unknown (Bass: {bass_name})"
 
 # --- 実行テスト ---
 if __name__ == "__main__":
@@ -138,3 +179,14 @@ if __name__ == "__main__":
     print("Test 5:", analyzer.analyze(parse_notes("C4, E4, G4, B4, D5"))) # Maj9
     print("Test 6:", analyzer.analyze(parse_notes("G4, B4, D5, F5, Ab5"))) # Dom7(b9)
     print("Test 7:", analyzer.analyze(parse_notes("C4, G4, E5"))) # C Major (E5がM3に正規化されるか)
+    # テスト8: Cメジャーの第一転回形 (ミ・ソ・ド)
+    print("Test 8:", analyzer.analyze(parse_notes("E4, G4, C5")))
+    
+    # テスト9: Cメジャーの第二転回形 (ソ・ド・ミ)
+    print("Test 9:", analyzer.analyze(parse_notes("G3, C4, E4")))
+    
+    # テスト10: テンションを含む複雑なオンコード (C Dom9 / E)
+    print("Test 10:", analyzer.analyze(parse_notes("E3, Bb3, C4, D4, G4")))
+
+    # テスト11: 入力順がバラバラでも自動でソートしてベース音を判定できるか
+    print("Test 11:", analyzer.analyze(parse_notes("C4, G3, E4")))
