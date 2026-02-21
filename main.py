@@ -143,17 +143,22 @@ class ChordAnalyzer:
                 
                 bass_alter_str = "#" if bass_note.alter == 1 else "b" if bass_note.alter == -1 else ""
                 bass_name = f"{bass_note.step}{bass_alter_str}"
+                        # --- ボイシングの種別判定（追加部分） ---
+                # 最低音（bass_note）と最高音（sorted_notesの最後）の半音差を計算
+                spread = sorted_notes[-1].absolute_semitone - sorted_notes[0].absolute_semitone
                 
+                # 1オクターブ（12半音）より広ければオープン、そうでなければクローズド
+                voicing_type = "Open" if spread > 12 else "Closed"
                 # スコアリング（優先順位付け）ロジック
                 # 音楽理論上、オンコードよりも基本形（ルートポジション）の方が解釈として自然なためスコアを高くする
                 is_root_position = (cand.pitch_class == bass_note.pitch_class)
                 score = 0
                 
                 if is_root_position:
-                    chord_name = f"{root_name} {quality}"
+                    chord_name = f"{root_name} {quality}({voicing_type})"
                     score += 10 # 基本形を強く優先
                 else:
-                    chord_name = f"{root_name} {quality} / {bass_name}"
+                    chord_name = f"{root_name} {quality} / {bass_name}({voicing_type})"
                     score += 0  # 転回形は優先度を下げる
                 
                 # 将来的に「よく使われるコードか（例: テンションよりシンプルな和音を優先）」などの
@@ -171,7 +176,7 @@ class ChordAnalyzer:
             bass_alter_str = "#" if bass_note.alter == 1 else "b" if bass_note.alter == -1 else ""
             bass_name = f"{bass_note.step}{bass_alter_str}"
             return f"Input: [{notes_str}] -> Analyzed: Unknown (Bass: {bass_name})"
-
+        
         # スコアが高い順（優先度順）にソート
         found_chords.sort(key=lambda x: x["score"], reverse=True)
         
