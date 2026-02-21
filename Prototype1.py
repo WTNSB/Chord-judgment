@@ -93,3 +93,5 @@ if __name__ == "__main__":
     # テストケース3: Ebメジャーセブンス (Eb4, G4, Bb4, D5)
     eb_maj7 = [Note('E', -1, 4), Note('G', 0, 4), Note('B', -1, 4), Note('D', 0, 5)]
     print(analyzer.analyze(eb_maj7))
+
+#a
