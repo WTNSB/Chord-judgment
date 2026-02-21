@@ -108,12 +108,11 @@ class ChordAnalyzer:
     def analyze(self, notes: List[Note]) -> str:
         if not notes: return "No notes"
 
-        # 1. 実際の入力音を高さ順にソートし、ベース音（最低音）を確定
+        # 1. ソートとベース音の確定
         sorted_notes = sorted(notes, key=lambda n: n.absolute_semitone)
         bass_note = sorted_notes[0]
 
-        # 2. 入力された音から、重複を省いた「仮のルート候補」のリストを作成
-        # ※ルートポジション（基本形）を優先して判定するため、ベース音の音名を最初にテストする
+        # 2. 仮のルート候補のリストを作成
         unique_cands = {}
         for n in sorted_notes:
             if n.pitch_class not in unique_cands:
@@ -124,13 +123,11 @@ class ChordAnalyzer:
             if pc != bass_note.pitch_class:
                 candidates.append(n)
 
+        found_chords = [] # 見つかったすべての解釈を格納するリスト
+
         # 3. 総当たり推論
         for cand in candidates:
-            # 仮想のルート音（ダミールート）をベース音のオクターブに生成
             dummy_root = Note(cand.step, cand.alter, bass_note.octave)
-            
-            # もしダミールートがベース音より高くなってしまったら、1オクターブ下げる
-            # (例: ベースが E4 で、仮ルートが G の場合、G4 だと E4 より高くなるため G3 にする)
             if dummy_root.absolute_semitone > bass_note.absolute_semitone:
                 dummy_root.octave -= 1
                 
@@ -138,33 +135,54 @@ class ChordAnalyzer:
             for note in sorted_notes:
                 intervals.add(self._get_interval(dummy_root, note))
                 
-            # 辞書と照合
             quality = self.chord_dictionary.get(frozenset(intervals))
             
             if quality:
-                # 4. 推論に成功した場合の出力フォーマット
                 cand_alter_str = "#" if cand.alter == 1 else "b" if cand.alter == -1 else ""
                 root_name = f"{cand.step}{cand_alter_str}"
                 
                 bass_alter_str = "#" if bass_note.alter == 1 else "b" if bass_note.alter == -1 else ""
                 bass_name = f"{bass_note.step}{bass_alter_str}"
                 
-                # ルートとベースが同じなら通常コード、違えばオンコード
-                if cand.pitch_class == bass_note.pitch_class:
+                # スコアリング（優先順位付け）ロジック
+                # 音楽理論上、オンコードよりも基本形（ルートポジション）の方が解釈として自然なためスコアを高くする
+                is_root_position = (cand.pitch_class == bass_note.pitch_class)
+                score = 0
+                
+                if is_root_position:
                     chord_name = f"{root_name} {quality}"
+                    score += 10 # 基本形を強く優先
                 else:
                     chord_name = f"{root_name} {quality} / {bass_name}"
-                    
-                notes_str = ", ".join(str(n) for n in sorted_notes)
-                intervals_str = ", ".join(intervals)
-                return f"Input: [{notes_str}] -> Analyzed: {chord_name}"
+                    score += 0  # 転回形は優先度を下げる
+                
+                # 将来的に「よく使われるコードか（例: テンションよりシンプルな和音を優先）」などの
+                # スコアリング基準をここに追加できます。
 
-        # どのルートを仮定しても辞書にない場合
+                found_chords.append({
+                    "name": chord_name,
+                    "score": score,
+                })
+
+        # 4. 結果のフォーマット
         notes_str = ", ".join(str(n) for n in sorted_notes)
-        bass_alter_str = "#" if bass_note.alter == 1 else "b" if bass_note.alter == -1 else ""
-        bass_name = f"{bass_note.step}{bass_alter_str}"
-        return f"Input: [{notes_str}] -> Analyzed: Unknown (Bass: {bass_name})"
 
+        if not found_chords:
+            bass_alter_str = "#" if bass_note.alter == 1 else "b" if bass_note.alter == -1 else ""
+            bass_name = f"{bass_note.step}{bass_alter_str}"
+            return f"Input: [{notes_str}] -> Analyzed: Unknown (Bass: {bass_name})"
+
+        # スコアが高い順（優先度順）にソート
+        found_chords.sort(key=lambda x: x["score"], reverse=True)
+        
+        best_chord = found_chords[0]["name"]
+        
+        # 複数の解釈がある場合は Alternatives として表示
+        if len(found_chords) > 1:
+            alternatives = ", ".join(c["name"] for c in found_chords[1:])
+            return f"Input: [{notes_str}] -> Analyzed: {best_chord} (Alternatives: {alternatives})"
+        else:
+            return f"Input: [{notes_str}] -> Analyzed: {best_chord}"
 # --- 実行テスト ---
 if __name__ == "__main__":
     analyzer = ChordAnalyzer()
@@ -190,3 +208,11 @@ if __name__ == "__main__":
 
     # テスト11: 入力順がバラバラでも自動でソートしてベース音を判定できるか
     print("Test 11:", analyzer.analyze(parse_notes("C4, G3, E4")))
+    # テスト12: エッジケース1 (C, E, G, A)
+    # ルートポジションである C6 が第一候補、Am7 / C が代替候補になるか検証
+    print("Test 12:", analyzer.analyze(parse_notes("C4, E4, G4, A4")))
+
+    # テスト13: エッジケース2 (B, D, F, G)
+    # G Dom7 / B と B m7b5 (今回はm6がないのでどう解釈されるか) などの複数解釈の検証
+    # ※辞書に G Dom7 があれば G Dom7 / B と解釈され、もし G7等がない場合は Unknown 等になります
+    print("Test 13:", analyzer.analyze(parse_notes("B3, D4, F4, G4")))

@@ -9,6 +9,9 @@ CHORD_DICT = {
     frozenset(['P1', 'm3', 'd5', 'm7']): "Min7b5",
     frozenset(['P1', 'M3', 'A5']): "Aug",
     
+
+    frozenset(['P1', 'M3', 'P5', 'M6']): "6",
+    frozenset(['P1', 'm3', 'P5', 'M6']): "m6",
     # --- テンションコード (9th) ---
     frozenset(['P1', 'M3', 'P5', 'M9']): "Add9",
     frozenset(['P1', 'M3', 'P5', 'M7', 'M9']): "Maj9",
