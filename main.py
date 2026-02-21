@@ -216,3 +216,21 @@ if __name__ == "__main__":
     # G Dom7 / B と B m7b5 (今回はm6がないのでどう解釈されるか) などの複数解釈の検証
     # ※辞書に G Dom7 があれば G Dom7 / B と解釈され、もし G7等がない場合は Unknown 等になります
     print("Test 13:", analyzer.analyze(parse_notes("B3, D4, F4, G4")))
+    print("--- 4度堆積と特殊系のテスト ---")
+    
+    # テスト14: 4度堆積 (C4, F4, Bb4, Eb5)
+    # 3度堆積で無理やり解釈すれば Cm11(omit5) にもなりますが、Quartal としてスマートに解釈します。
+    print("Test 14:", analyzer.analyze(parse_notes("C4, F4, Bb4, Eb5")))
+
+    # テスト15: 5度堆積 (C4, G4, D5)
+    # Sus2やAdd9(omit3)とも解釈できますが、5度堆積として独立させました。
+    print("Test 15:", analyzer.analyze(parse_notes("C4, G4, D5")))
+
+    # テスト16: ドイツの増6の和音 vs ドミナントセブンス
+    # 鍵盤で弾くと同じ音（Ab, C, Eb, Gb/F#）ですが、記譜（意味）が異なります！
+    
+    # 1. Ab ドミナントセブンス (Ab, C, Eb, Gb) -> m7 が含まれる
+    print("Test 16-1:", analyzer.analyze(parse_notes("Ab3, C4, Eb4, Gb4")))
+    
+    # 2. Ab ベースのドイツの増6 (Ab, C, Eb, F#) -> A6 (増6度) が含まれる
+    print("Test 16-2:", analyzer.analyze(parse_notes("Ab3, C4, Eb4, F#4")))
