@@ -36,7 +36,7 @@ class ChordAnalyzer:
         
         # 将来の拡張ポイント例：
         # self._search_ust_and_polychord(...)
-        # self._search_fallback_rulebased(...)
+        self._search_fallback_rulebased(sorted_notes, unique_cands, bass_note, bass_name, voicing_type, categorized_results)
 
         return self._format_output(sorted_notes, bass_name, categorized_results, threshold)
     def _search_fallback_rulebased(self, sorted_notes: List[Note], unique_cands: dict, bass_note: Note, bass_name: str, voicing_type: str, results: dict):

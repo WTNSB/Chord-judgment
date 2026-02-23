@@ -34,3 +34,5 @@ if __name__ == "__main__":
     print("Test 16-2:", analyzer.analyze(parse_notes("Ab3, C4, Eb4, F#4")))
 
     print("柴又テスト:", analyzer.analyze(parse_notes("G3, B3, D#4, F4, A#4")))
+
+    print("b9th:", analyzer.analyze(parse_notes("C,E,G,Db")))
