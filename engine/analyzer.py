@@ -78,7 +78,7 @@ class ChordAnalyzer:
                         results[category].append({"name": f"{name} ({voicing_type}) [生成]", "score": score})
 
     def _search_ust_and_polychord(self, sorted_notes: List[Note], unique_cands: Dict[int, Note], input_pcs: Set[int], bass_note: Note, bass_name: str, voicing_type: str, results: Dict):
-        """アッパーストラクチャートライアドUSTおよびポリコードの分割探索"""
+        """アッパーストラクチャートライアド（UST）およびポリコードの分割探索"""
         # 構成音が4音未満の場合はUSTを構成できないためスキップ
         if len(input_pcs) < 4:
             return
@@ -144,9 +144,10 @@ class ChordAnalyzer:
 
                     # ボトムが和音として成立していれば、USTとして出力！
                     if bottom_quality is not None:
+                        
+                        # --- 誤って省略してしまった名前の生成処理 ---
                         top_alter_str = "#" if top_cand.alter == 1 else "b" if top_cand.alter == -1 else ""
                         top_name = f"{top_cand.step}{top_alter_str}"
-                        # Majorトライアドの場合は "D Major" ではなく単に "D" と表記する
                         top_chord_name = top_name if triad_name == "Major" else f"{top_name} {triad_name}"
 
                         bottom_alter_str = "#" if bottom_cand.alter == 1 else "b" if bottom_cand.alter == -1 else ""
@@ -154,12 +155,34 @@ class ChordAnalyzer:
 
                         ust_name = f"{top_chord_name} / {bottom_name}{bottom_quality}"
                         
-                        # USTは意図的な高度なボイシングなので非常に高く評価する
-                        score = 80 
+                        # --- USTスコアリングの精緻化 ---
+                        root_diff = (top_pc - bottom_root_pc) % 12
+                        score = 70 # 基礎点
+                        
+                        # 王道のインターバル (M2: 2, m3: 3, d5/A4: 6, M6: 9) はジャズで頻出するためボーナス
+                        if root_diff in [2, 3, 6, 9] and triad_name in ["Major", "Minor"]:
+                            score += 15 # 最大85点になる（通常探索の基本形80点を超える！）
+                            
+                        # AugやDimは対称構造ゆえの「数学的なこじつけ」が発生しやすいためペナルティ
+                        if triad_name in ["Aug", "Dim"]:
+                            score -= 10 
                         
                         if not any(r['name'].startswith(ust_name) for r in results["特殊形 (Special)"]):
                             results["特殊形 (Special)"].append({"name": f"{ust_name} (UST) ({voicing_type})", "score": score})
-
+    def _calculate_inversion_penalty(self, bass_interval: int) -> int:
+        """
+        ベース音のインターバルから、転回形やオンコードの不安定さをペナルティとして返す
+        """
+        if bass_interval in [3, 4]:     # m3, M3 (第1転回形: 比較的安定)
+            return 5
+        elif bass_interval == 7:        # P5 (第2転回形: 響きは良いが機能が少し曖昧になる)
+            return 10
+        elif bass_interval in [10, 11]: # m7, M7 (第3転回形: 不安定、強い進行感を求める)
+            return 15
+        elif bass_interval in [6, 8]:   # d5, A5 (オルタードなベース音: かなり不安定)
+            return 15
+        else:                           # それ以外のテンションなど（オンコード）
+            return 20
     def _get_category(self, is_root_position: bool, is_rootless: bool, quality: str, dummy_root_pc: int, bass_note: Note) -> str:
         if any(sq in quality for sq in ["Quartal", "Quintal", "+6", "Cluster"]):
             return "特殊形 (Special)"
@@ -190,17 +213,26 @@ class ChordAnalyzer:
             quality = self.chord_dictionary.get(frozenset(intervals))
             if quality:
                 category = self._get_category(is_root_pos, False, quality, root_pc, bass_note)
-                score = 80 if is_root_pos else 60
+                
+                # スコア計算の精緻化
+                if category == "特殊形 (Special)":
+                    score = 75 
+                elif is_root_pos:
+                    score = 80 # 基本形は満点(80)
+                else:
+                    # 転回形・オンコードはベース音の度数によってペナルティを引く
+                    bass_interval = (bass_note.pitch_class - root_pc) % 12
+                    score = 80 - self._calculate_inversion_penalty(bass_interval)
                 
                 if category == "特殊形 (Special)":
                     name = f"{quality} on {bass_name}"
-                    score = 75 
                 else:
                     name = f"{root_name} {quality}" if is_root_pos else f"{root_name} {quality} / {bass_name}"
                     
                 results[category].append({"name": f"{name} ({voicing_type})", "score": score})
             
             # B. Omit5 補完
+            # （※ここでquality_omitを定義する処理が必要でした）
             if not quality and 'P5' not in intervals:
                 intervals_with_p5 = set(intervals)
                 intervals_with_p5.add('P5')
@@ -208,7 +240,14 @@ class ChordAnalyzer:
                 
                 if quality_omit:
                     category = self._get_category(is_root_pos, False, quality_omit, root_pc, bass_note)
-                    score = 65 if is_root_pos else 45 
+                    
+                    # スコア計算の精緻化 (Omit5なので基礎点は65)
+                    if is_root_pos:
+                        score = 65
+                    else:
+                        bass_interval = (bass_note.pitch_class - root_pc) % 12
+                        score = 65 - self._calculate_inversion_penalty(bass_interval)
+                        
                     name = f"{root_name} {quality_omit}(omit5)" if is_root_pos else f"{root_name} {quality_omit}(omit5) / {bass_name}"
                     results[category].append({"name": f"{name} ({voicing_type})", "score": score})
 
