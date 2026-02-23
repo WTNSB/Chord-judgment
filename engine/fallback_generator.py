@@ -1,10 +1,10 @@
-from typing import Set, Optional
+from typing import Set, List
 
 class RuleBasedGenerator:
     """辞書にない未知のテンション和音を、骨格とテンションに分解して動的生成するクラス"""
 
     @staticmethod
-    def generate_chord_name(intervals: Set[str]) -> Optional[str]:
+    def generate_chord_names(intervals: Set[str]) -> List[str]:
         # 1. 骨格の判定（3度、5度、7度の組み合わせ）
         has_M3 = 'M3' in intervals
         has_m3 = 'm3' in intervals
@@ -15,26 +15,28 @@ class RuleBasedGenerator:
         has_A5 = 'A5' in intervals
         has_d7 = 'd7' in intervals
 
-        base = "Unknown"
+        base_options = []
         
         # 4和音の骨格判定（特殊な5度を含むものを優先して判定）
-        if has_M3 and has_A5 and has_m7: base = "aug7"
-        elif has_M3 and has_A5 and has_M7: base = "augM7"
-        elif has_m3 and has_d5 and has_m7: base = "m7b5"
-        elif has_m3 and has_d5 and has_d7: base = "dim7"
-        elif has_M3 and has_M7: base = "Maj7"
-        elif has_m3 and has_m7: base = "m7"
-        elif has_M3 and has_m7: base = "7"  # ドミナントセブンス
-        elif has_m3 and has_M7: base = "mM7"
+        if has_M3 and has_A5 and has_m7: 
+            base_options.extend(["aug7", "7(#5)"])  # ★両方の表記を登録
+        elif has_M3 and has_A5 and has_M7: 
+            base_options.extend(["augM7", "Maj7(#5)"])
+        elif has_m3 and has_d5 and has_m7: base_options.append("m7b5")
+        elif has_m3 and has_d5 and has_d7: base_options.append("dim7")
+        elif has_M3 and has_M7: base_options.append("Maj7")
+        elif has_m3 and has_m7: base_options.append("m7")
+        elif has_M3 and has_m7: base_options.append("7")  
+        elif has_m3 and has_M7: base_options.append("mM7")
+        
         # 3和音の骨格判定
-        elif has_M3 and has_A5: base = "aug"
-        elif has_m3 and has_d5: base = "dim"
-        elif has_M3: base = "Major"
-        elif has_m3: base = "Minor"
+        elif has_M3 and has_A5: base_options.append("aug")
+        elif has_m3 and has_d5: base_options.append("dim")
+        elif has_M3: base_options.append("Major")
+        elif has_m3: base_options.append("Minor")
 
-        # 3度がなく、sus系やパワーコードの骨格の場合は辞書引きに任せるためここでは弾く
-        if base == "Unknown":
-            return None
+        if not base_options:
+            return []
 
         # 2. テンションの抽出
         tensions = []
@@ -46,14 +48,24 @@ class RuleBasedGenerator:
         if 'm13' in intervals: tensions.append("b13")
         if 'M13' in intervals: tensions.append("13")
 
-        tension_str = ""
-        if tensions:
-            tension_str = f"({', '.join(tensions)})"
-
         # 3. Omit5判定 (5度の音がどれも含まれていない場合)
         omit_str = ""
-        if not (has_P5 or has_d5 or has_A5) and base not in ["dim7", "dim", "aug", "aug7", "augM7", "m7b5"]:
+        rep_base = base_options[0]
+        if not (has_P5 or has_d5 or has_A5) and rep_base not in ["dim7", "dim", "aug7", "augM7", "m7b5", "aug"]:
             omit_str = "(omit5)"
 
-        # 例: 骨格が "aug7" で、テンションが "#9" の場合 -> "aug7(#9)"
-        return f"{base}{tension_str}{omit_str}"
+        # 4. 文字列の結合処理（カッコの中身を綺麗にまとめる）
+        results = []
+        for base in base_options:
+            if "(" in base and tensions:
+                # "7(#5)" のような表記に "#9" を足す場合 -> "7(#5, #9)" に整形
+                base_stripped = base.rstrip(")")
+                tension_joined = ", ".join(tensions)
+                chord_name = f"{base_stripped}, {tension_joined}){omit_str}"
+            else:
+                tension_str = f"({', '.join(tensions)})" if tensions else ""
+                chord_name = f"{base}{tension_str}{omit_str}"
+            
+            results.append(chord_name)
+
+        return results

@@ -35,4 +35,16 @@ if __name__ == "__main__":
 
     print("柴又テスト:", analyzer.analyze(parse_notes("G3, B3, D#4, F4, A#4")))
 
-    print("b9th:", analyzer.analyze(parse_notes("C,E,G,Db")))
+    print("b9th:", analyzer.analyze(parse_notes("E,G,Db")))
+
+    print("--- UST (アッパーストラクチャートライアド) のテスト ---")
+    
+    # テスト17: D / C7 (C13(#11) のUST解釈)
+    # 左手で C, E, Bb (C7の骨格) を弾き、右手で D, F#, A (Dメジャー) を弾く
+    print("Test 17:", analyzer.analyze(parse_notes("C3, E3, Bb3, D4, F#4, A4")))
+
+    # テスト18: A / C7 (C13(b9) のUST解釈)
+    # 左手で C, E, Bb を弾き、右手で A, C#, E (Aメジャー) を弾く
+    print("Test 18:", analyzer.analyze(parse_notes("C3, E3, Bb3, A4, C#5, E5")))
+
+    print("Test 19:", analyzer.analyze(parse_notes("C3, G3")))    
