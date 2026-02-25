@@ -198,17 +198,26 @@ class ChordAnalyzer:
         else:
             return "オンコード (On-Chord)"
 
-    def _search_normal(self, sorted_notes: List[Note], unique_cands: Dict[int, Note], bass_note: Note, bass_name: str, voicing_type: str, results: Dict):
+        def _search_normal(self, sorted_notes: List[Note], unique_cands: Dict[int, Note], bass_note: Note, bass_name: str, voicing_type: str, results: Dict):
         for root_pc, cand in unique_cands.items():
             dummy_root = Note(cand.step, cand.alter, bass_note.octave)
             if dummy_root.absolute_semitone > bass_note.absolute_semitone:
                 dummy_root.octave -= 1
                 
-            intervals = {get_interval(dummy_root, note) for note in sorted_notes}
+            # --- 修正・追加部分 ---
             cand_alter_str = "#" if cand.alter == 1 else "b" if cand.alter == -1 else ""
             root_name = f"{cand.step}{cand_alter_str}"
-            is_root_pos = (root_pc == bass_note.pitch_class)
             
+            # 各音に対して計算されたインターバルをデバッグ表示
+            interval_details = []
+            intervals = set()
+            for note in sorted_notes:
+                inter = get_interval(dummy_root, note)
+                intervals.add(inter)
+                interval_details.append(f"{note}: {inter}")
+            
+            print(f"Candidate Root: {root_name} | Intervals: {', '.join(interval_details)}")
+            # ----------------------
             # A. 完全一致
             quality = self.chord_dictionary.get(frozenset(intervals))
             if quality:
