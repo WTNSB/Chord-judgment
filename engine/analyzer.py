@@ -218,6 +218,7 @@ class ChordAnalyzer:
             
             print(f"Candidate Root: {root_name} | Intervals: {', '.join(interval_details)}")
             # ----------------------
+            is_root_pos = (root_pc == bass_note.pitch_class)
             # A. 完全一致
             quality = self.chord_dictionary.get(frozenset(intervals))
             if quality:
