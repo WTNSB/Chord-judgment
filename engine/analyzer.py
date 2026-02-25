@@ -198,7 +198,7 @@ class ChordAnalyzer:
         else:
             return "オンコード (On-Chord)"
 
-        def _search_normal(self, sorted_notes: List[Note], unique_cands: Dict[int, Note], bass_note: Note, bass_name: str, voicing_type: str, results: Dict):
+    def _search_normal(self, sorted_notes: List[Note], unique_cands: Dict[int, Note], bass_note: Note, bass_name: str, voicing_type: str, results: Dict):
         for root_pc, cand in unique_cands.items():
             dummy_root = Note(cand.step, cand.alter, bass_note.octave)
             if dummy_root.absolute_semitone > bass_note.absolute_semitone:
